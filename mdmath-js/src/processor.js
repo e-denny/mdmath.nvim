@@ -157,10 +157,12 @@ async function processEquation(identifier, equation, cWidth, cHeight, width, hei
         const {height: pngHeight} = await pngDimensions(basePNG);
         renderedHeightPx = pngHeight;
 
-        // Number of cell rows needed to contain the equation (always >= 1)
-        height = Math.max(1, Math.ceil(pngHeight / (cHeight * internalScale)));
+        // Keep inline equations at exactly 1 cell row. Kitty renders the full
+        // image regardless, so tall equations (superscripts, etc.) overflow into
+        // surrounding cell space without displacing text below.
+        height = 1;
         iWidth = width * cWidth * internalScale;
-        iHeight = height * cHeight * internalScale;
+        iHeight = Math.max(pngHeight, cHeight * internalScale);
     } else {
         iWidth = width * cWidth * internalScale;
         iHeight = height * cHeight * internalScale;
