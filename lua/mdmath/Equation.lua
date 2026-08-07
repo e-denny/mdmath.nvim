@@ -89,7 +89,7 @@ function Equation:_create(res, err)
                 self.mark_id = marks.add(self.bufnr, self.pos[1], self.pos[2], {
                     text = { text, self.text:len() },
                     color = color,
-                    text_pos = 'overlay',
+                    text_pos = 'inline',
                 })
                 self.image = image
                 self.created = true

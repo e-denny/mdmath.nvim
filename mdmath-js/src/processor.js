@@ -154,9 +154,12 @@ async function processEquation(identifier, equation, cWidth, cHeight, width, hei
         // pad to a cell-aligned canvas via pngFitTo.
         basePNG = await rsvgConvert(svg, {zoom: inlineZoom});
 
-        const {height: pngHeight} = await pngDimensions(basePNG);
+        const {width: pngWidth, height: pngHeight} = await pngDimensions(basePNG);
         renderedHeightPx = pngHeight;
 
+        // Use the actual rendered width so the image cols match the equation,
+        // letting surrounding text reflow to fit rather than the source $...$ width.
+        width = Math.max(1, Math.ceil(pngWidth / (cWidth * internalScale)));
         // Keep inline equations at exactly 1 cell row. Kitty renders the full
         // image regardless, so tall equations (superscripts, etc.) overflow into
         // surrounding cell space without displacing text below.

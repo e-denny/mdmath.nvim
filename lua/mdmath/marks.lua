@@ -266,6 +266,26 @@ local function opts2extmark(opts, row, col)
             col = 0 -- reset col for next line
         end
         return extmarks, true
+    elseif opts.text_pos == 'inline' then
+        -- Conceal the source $...$ text, then insert the image placeholder inline.
+        -- This lets surrounding text reflow to the actual image width.
+        local conceal_data = {
+            end_col = col + opts.text[2],
+            conceal = '',
+            ephemeral = false,
+            undo_restore = false,
+        }
+        local inline_data = {
+            virt_text = { { opts.text[1], opts.color } },
+            virt_text_pos = 'inline',
+            virt_text_hide = true,
+            ephemeral = false,
+            undo_restore = false,
+        }
+        return {
+            { data = conceal_data, row = row, col = col },
+            { data = inline_data,  row = row, col = col },
+        }, false
     else
         local data = {
             virt_text = { { opts.text[1], opts.color } },
