@@ -72,6 +72,16 @@ function Processor:setDynamicScale(scale)
     self:_assert(not err, 'failed to set dynamic scale: ', err)
 end
 
+function Processor:setBaselineFrac(frac)
+    local code, err = self.pipes[0]:write(string.format("0:bfrac:%.4f:", frac))
+    self:_assert(not err, 'failed to set baseline frac: ', err)
+end
+
+function Processor:setInlineScale(scale)
+    local code, err = self.pipes[0]:write(string.format("0:ilscale:%.4f:", scale))
+    self:_assert(not err, 'failed to set inline scale: ', err)
+end
+
 function Processor:request(data, cell_width, cell_height, width, height, flags, color, callback)
     -- width/height should be number of cells
     -- flags: 0: none, 1: dynamic, 2: center, 3: dynamic + center
@@ -224,6 +234,8 @@ function Processor:_init()
     -- self:setForeground(config.foreground)
     self:setInternalScale(config.internal_scale)
     self:setDynamicScale(config.dynamic_scale)
+    self:setBaselineFrac(config.baseline_frac)
+    self:setInlineScale(config.inline_scale)
 end
 
 function Processor:close()
