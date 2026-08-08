@@ -22,7 +22,8 @@ local default_opts = {
     internal_scale = 1.0,
     -- Fraction of cell height from top to the terminal font baseline (win ascent / (win ascent + win descent)).
     -- Typical range: 0.75-0.85. Adjust if inline equations appear too high or too low.
-    baseline_frac = 0.78,
+    -- nil (default) enables auto-detection from the kitty font configuration.
+    baseline_frac = nil,
     -- Scale factor for inline equations. Controls the rendered size relative to the terminal font.
     -- At 1.0 it uses dynamic_scale. Lower values shrink inline math to better match text size.
     inline_scale = 1.0,
@@ -68,7 +69,7 @@ function M.validate()
         dynamic = {opts.dynamic, 'boolean'},
         dynamic_scale = {opts.dynamic_scale, 'number'},
         internal_scale = {opts.internal_scale, 'number'},
-        baseline_frac = {opts.baseline_frac, 'number'},
+        baseline_frac = {opts.baseline_frac, {'number', 'nil'}},
         inline_scale = {opts.inline_scale, 'number'},
     }
 

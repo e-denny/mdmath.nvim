@@ -82,6 +82,11 @@ function Processor:setInlineScale(scale)
     self:_assert(not err, 'failed to set inline scale: ', err)
 end
 
+function Processor:setFontFamily(family)
+    local code, err = self.pipes[0]:write(string.format("0:fontfamily:%d:%s", #family, family))
+    self:_assert(not err, 'failed to set font family: ', err)
+end
+
 function Processor:request(data, cell_width, cell_height, width, height, flags, color, callback)
     -- width/height should be number of cells
     -- flags: 0: none, 1: dynamic, 2: center, 3: dynamic + center
@@ -234,7 +239,14 @@ function Processor:_init()
     -- self:setForeground(config.foreground)
     self:setInternalScale(config.internal_scale)
     self:setDynamicScale(config.dynamic_scale)
-    self:setBaselineFrac(config.baseline_frac)
+    if config.baseline_frac ~= nil then
+        self:setBaselineFrac(config.baseline_frac)
+    else
+        local family = require'mdmath.kitty'.font_family()
+        if family then
+            self:setFontFamily(family)
+        end
+    end
     self:setInlineScale(config.inline_scale)
 end
 

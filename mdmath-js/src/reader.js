@@ -55,6 +55,16 @@ reader.listen = function(callback) {
                     scale
                 };
                 callback(response);
+            } else if (type == 'fontfamily') {
+                const length = await stream.readInt();
+                const data = await stream.readFixedString(length);
+
+                const response = {
+                    identifier,
+                    type,
+                    data
+                };
+                callback(response);
             } else {
                 response_fail(`Identifier ${identifier}: Invalid request type: ${type}`);
             }

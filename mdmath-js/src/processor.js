@@ -1,4 +1,7 @@
 import fs from 'fs';
+import { execSync } from 'node:child_process';
+import opentypePkg from 'opentype.js';
+const { parse: parseFont } = opentypePkg;
 import mathjax from 'mathjax';
 import reader from './reader.js';
 import { pngDimensions, pngFitTo, rsvgConvert } from './magick.js';
@@ -27,8 +30,67 @@ let internalScale = 1;
 let dynamicScale = 1;
 let inlineScale = 1;
 // Fraction of cell height from top to the terminal font's baseline (win ascent / (win ascent + win descent)).
-// Typical value for monospace fonts: 0.78-0.80.
+// Typical value for monospace fonts: 0.78-0.80. Set by autodetection or overridden by user config.
 let baselineFrac = 0.78;
+
+// Resolve a kitty font_family string to a font file path via fc-list fuzzy match.
+// Returns null if no match is found or fc-list is unavailable.
+function resolveFontFile(kittyFamily) {
+    let fcOutput;
+    try {
+        fcOutput = execSync('fc-list --format="%{family}\\t%{file}\\n"', {encoding: 'utf8'});
+    } catch (_) {
+        return null;
+    }
+
+    const normFamily = (s) => s.replace(/\s+/g, '').toLowerCase();
+    const kittyNorm = normFamily(kittyFamily);
+
+    let bestFile = null;
+    let bestScore = -1;
+
+    for (const line of fcOutput.split('\n')) {
+        const tab = line.indexOf('\t');
+        if (tab < 0) continue;
+        const families = line.slice(0, tab).split(',');
+        const file = line.slice(tab + 1).trim();
+        if (!file.match(/\.(otf|ttf)$/i)) continue;
+
+        for (const fam of families) {
+            const normFam = normFamily(fam.trim());
+            if (normFam.includes(kittyNorm) || kittyNorm.includes(normFam)) {
+                // Prefer Regular style files so we get the base metrics
+                const score = file.toLowerCase().includes('regular') ? 2 : 1;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestFile = file;
+                }
+            }
+        }
+    }
+
+    return bestFile;
+}
+
+// Compute baseline_frac from a font file's OS/2 win ascent/descent metrics.
+// Returns null if the file can't be read or the table is missing.
+function computeBaselineFrac(fontFile) {
+    let buf;
+    try {
+        buf = fs.readFileSync(fontFile);
+    } catch (_) {
+        return null;
+    }
+
+    try {
+        const font = parseFont(buf.buffer);
+        const os2 = font.tables.os2;
+        if (!os2 || !os2.usWinAscent || !os2.usWinDescent) return null;
+        return os2.usWinAscent / (os2.usWinAscent + os2.usWinDescent);
+    } catch (_) {
+        return null;
+    }
+}
 
 let MathJax = undefined;
 
@@ -235,6 +297,14 @@ function processAll(request) {
         baselineFrac = request.scale;
     } else if (request.type === 'ilscale') {
         inlineScale = request.scale;
+    } else if (request.type === 'fontfamily') {
+        const fontFile = resolveFontFile(request.data);
+        if (fontFile) {
+            const frac = computeBaselineFrac(fontFile);
+            if (frac !== null) {
+                baselineFrac = frac;
+            }
+        }
     }
 }
 

@@ -6,7 +6,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "mathjax": "^3.2.2"
+    "mathjax": "^3.2.2",
+    "opentype.js": "^2.0.0"
   },
   "type": "module"
 }
