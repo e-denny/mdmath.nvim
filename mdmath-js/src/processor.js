@@ -154,13 +154,15 @@ function parseViewbox(svgString) {
 
 // Returns {descentEx, totalEx} parsed from MathJax SVG style/height attributes.
 // descentEx is the depth below the baseline; totalEx is the full height, both in ex units.
+// MathJax omits vertical-align when descent is zero (e.g. uppercase-only equations like "L"),
+// so a missing style is treated as descentEx = 0 rather than a parse failure.
 function parseBaselineMetrics(svgString) {
-    const styleMatch = svgString.match(/style="[^"]*vertical-align:\s*(-?[\d.]+)ex/);
     const heightMatch = svgString.match(/\sheight="([\d.]+)ex"/);
-    if (!styleMatch || !heightMatch) return null;
+    if (!heightMatch) return null;
 
-    const descentEx = -parseFloat(styleMatch[1]); // vertical-align is negative for descent
     const totalEx = parseFloat(heightMatch[1]);
+    const styleMatch = svgString.match(/style="[^"]*vertical-align:\s*(-?[\d.]+)ex/);
+    const descentEx = styleMatch ? -parseFloat(styleMatch[1]) : 0;
     return { descentEx, totalEx };
 }
 
