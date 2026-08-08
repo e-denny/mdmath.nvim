@@ -30,6 +30,26 @@ function Buffer:_init(bufnr)
     self.timer = uv.new_timer()
     assert(self.timer, 'failed to create a timer')
 
+    -- Conceal extmarks require conceallevel >= 2 to hide source text.
+    -- Set it on all windows currently showing this buffer, and on future ones.
+    local function set_conceallevel(winid)
+        if vim.api.nvim_win_get_buf(winid) == bufnr then
+            if vim.wo[winid].conceallevel < 2 then
+                vim.wo[winid].conceallevel = 2
+            end
+        end
+    end
+    for _, winid in ipairs(vim.api.nvim_list_wins()) do
+        set_conceallevel(winid)
+    end
+    nvim.create_autocmd({'BufWinEnter'}, {
+        buffer = bufnr,
+        group = augroup,
+        callback = function(ev)
+            set_conceallevel(vim.api.nvim_get_current_win())
+        end,
+    })
+
     self:attach()
 
     nvim.create_autocmd({'InsertLeave'}, {

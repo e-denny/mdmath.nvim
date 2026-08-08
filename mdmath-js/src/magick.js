@@ -111,12 +111,26 @@ export async function pngDimensions(png) {
  * @param {number} height - The target height.
  * @param {Object} options - Options for fitting the image.
  * @param {boolean} options.center - Whether to center the image in the output dimensions.
+ * @param {number} [options.yOffset] - Top padding in pixels (overrides center; places image at this y offset).
  * @returns {Promise<{width: number, height: number}>} The dimensions of the output image.
  */
-export async function pngFitTo(input, output, width, height, {center}) {
+export async function pngFitTo(input, output, width, height, {center, yOffset}) {
     const size = `${width}x${height}`;
 
-    const args = ['png:-', '-background', 'none', '-gravity', center ? 'Center' : 'West', '-extent', size];
+    let args;
+    if (yOffset !== undefined && yOffset !== null) {
+        const offset = Math.round(yOffset);
+        if (offset >= 0) {
+            // Add transparent rows at top, then crop canvas to target size
+            args = ['png:-', '-background', 'none', '-splice', `0x${offset}`, '-extent', size];
+        } else {
+            // Remove rows from top (image overflows above cell), then pad bottom to target size
+            args = ['png:-', '-background', 'none', '-chop', `0x${-offset}`,
+                    '-gravity', 'North', '-extent', size];
+        }
+    } else {
+        args = ['png:-', '-background', 'none', '-gravity', center ? 'Center' : 'West', '-extent', size];
+    }
     args.push(`png:${output}`);
 
     const magick = await magickBinary;

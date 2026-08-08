@@ -46,13 +46,23 @@ reader.listen = function(callback) {
                     data
                 };
                 callback(response);
-            } else if(type == 'iscale' || type == 'dscale') {
+            } else if(type == 'iscale' || type == 'dscale' || type == 'bfrac' || type == 'ilscale') {
                 const scale = await stream.readFloat();
 
                 const response = {
                     identifier,
                     type,
                     scale
+                };
+                callback(response);
+            } else if (type == 'fontfamily') {
+                const length = await stream.readInt();
+                const data = await stream.readFixedString(length);
+
+                const response = {
+                    identifier,
+                    type,
+                    data
                 };
                 callback(response);
             } else {

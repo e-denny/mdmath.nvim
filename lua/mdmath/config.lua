@@ -20,6 +20,13 @@ local default_opts = {
     -- WARNING: This do not affect how the images are displayed, only how many pixels are used to render them.
     --          See `dynamic_scale` to modify the displayed size.
     internal_scale = 1.0,
+    -- Fraction of cell height from top to the terminal font baseline (win ascent / (win ascent + win descent)).
+    -- Typical range: 0.75-0.85. Adjust if inline equations appear too high or too low.
+    -- nil (default) enables auto-detection from the kitty font configuration.
+    baseline_frac = nil,
+    -- Scale factor for inline equations. Controls the rendered size relative to the terminal font.
+    -- At 1.0 it uses dynamic_scale. Lower values shrink inline math to better match text size.
+    inline_scale = 1.0,
 }
 
 local _opts = nil
@@ -62,6 +69,8 @@ function M.validate()
         dynamic = {opts.dynamic, 'boolean'},
         dynamic_scale = {opts.dynamic_scale, 'number'},
         internal_scale = {opts.internal_scale, 'number'},
+        baseline_frac = {opts.baseline_frac, {'number', 'nil'}},
+        inline_scale = {opts.inline_scale, 'number'},
     }
 
     opts.foreground = require'mdmath.util'.hl_as_hex(opts.foreground)
