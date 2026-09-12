@@ -7,6 +7,10 @@ if not stdout then
     error('failed to open stdout')
 end
 
+-- Kitty's unicode placeholders encode the row/column with a fixed list of
+-- diacritics, so an image can never have more rows/columns than that list.
+local MAX_CELLS = #diacritics
+
 -- FIXME: This is a temporary solution to avoid conflicts with other plugins that
 -- also uses Kitty's image protocol. We should find a better way to handle this.
 local _id = 333
@@ -62,11 +66,11 @@ function Image:_init(rows, cols, payload)
     end
 
     self.id = id
-    self.rows = rows
-    self.cols = cols
+    self.rows = math.min(rows, MAX_CELLS)
+    self.cols = math.min(cols, MAX_CELLS)
 
     kitty_send({i = id, f = 100, t = 'f'}, payload)
-    kitty_send({i = id, U = 1, a = 'p', r = rows, c = cols})
+    kitty_send({i = id, U = 1, a = 'p', r = self.rows, c = self.cols})
 end
 
 function Image.unicode_at(row, col)

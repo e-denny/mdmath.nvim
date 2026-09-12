@@ -30,32 +30,72 @@ function Buffer:_init(bufnr)
     self.timer = uv.new_timer()
     assert(self.timer, 'failed to create a timer')
 
+    -- Original 'wrap' value per window, restored when mdmath is disabled.
+    self.saved_wrap = {}
+
     -- Conceal extmarks require conceallevel >= 2 to hide source text.
-    -- Set it on all windows currently showing this buffer, and on future ones.
-    local function set_conceallevel(winid)
+    -- Rendered equations are also laid out one image row per buffer line, so a
+    -- buffer line wider than the window must not wrap: the wrapped screen rows
+    -- have no image row and would split the equation with a blank gap.
+    -- Set both on all windows currently showing this buffer, and on future ones.
+    local function set_window_opts(winid)
         if vim.api.nvim_win_get_buf(winid) == bufnr then
             if vim.wo[winid].conceallevel < 2 then
                 vim.wo[winid].conceallevel = 2
             end
+            if self.saved_wrap[winid] == nil then
+                self.saved_wrap[winid] = vim.wo[winid].wrap
+            end
+            vim.wo[winid].wrap = false
         end
     end
     for _, winid in ipairs(vim.api.nvim_list_wins()) do
-        set_conceallevel(winid)
+        set_window_opts(winid)
     end
+
+    -- While typing, give the user their original wrapping back so long source
+    -- lines remain editable. Images are hidden on insert anyway when
+    -- `hide_on_insert` is set, so there is no equation layout to keep aligned.
+    local function restore_wrap()
+        for winid, wrap in pairs(self.saved_wrap) do
+            if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == bufnr then
+                vim.wo[winid].wrap = wrap
+            end
+        end
+    end
+
+    local function disable_wrap()
+        for winid in pairs(self.saved_wrap) do
+            if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == bufnr then
+                vim.wo[winid].wrap = false
+            end
+        end
+    end
+
     nvim.create_autocmd({'BufWinEnter'}, {
         buffer = bufnr,
         group = augroup,
         callback = function(ev)
-            set_conceallevel(vim.api.nvim_get_current_win())
+            set_window_opts(vim.api.nvim_get_current_win())
         end,
     })
 
     self:attach()
 
+    nvim.create_autocmd({'InsertEnter'}, {
+        buffer = bufnr,
+        group = augroup,
+        callback = function()
+            if config.hide_on_insert then
+                restore_wrap()
+            end
+        end
+    })
     nvim.create_autocmd({'InsertLeave'}, {
         buffer = bufnr,
         group = augroup,
         callback = function()
+            disable_wrap()
             self:parse_view()
         end
     })
@@ -100,6 +140,13 @@ function Buffer:free()
     self.timer:close()
 
     self:clear(false)
+
+    for winid, wrap in pairs(self.saved_wrap) do
+        if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == self.bufnr then
+            vim.wo[winid].wrap = wrap
+        end
+    end
+    self.saved_wrap = {}
 
     nvim.clear_autocmds {
         group = augroup,

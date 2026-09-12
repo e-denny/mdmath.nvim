@@ -7,7 +7,13 @@ local Processor = require'mdmath.Processor'
 local Image = require'mdmath.Image'
 local tracker = require'mdmath.tracker'
 local terminfo = require'mdmath.terminfo'
+local diacritics = require'mdmath.Image.diacritics'
 local config = require'mdmath.config'.opts
+
+-- Kitty's unicode placeholders encode the row/column with a fixed list of
+-- diacritics. Cap the requested size so the generated image is representable;
+-- the overlay pads the source line to its original width with spaces.
+local MAX_CELLS = #diacritics
 
 local Equation = util.class 'Equation'
 
@@ -138,6 +144,7 @@ function Equation:_init(bufnr, row, col, text, opts)
     if not self.lines then
         self.width = util.strwidth(text)
     end
+    self.width = math.min(self.width, MAX_CELLS)
     self.created = false
     self.valid = true
     self.color = color
@@ -159,6 +166,7 @@ function Equation:_init(bufnr, row, col, text, opts)
         height = 1
         flags = 2 -- centered
     end
+    height = math.min(height, MAX_CELLS)
 
     local processor = Processor.from_bufnr(bufnr)
     processor:request(self.equation, cell_width, cell_height, self.width, height, flags, color, function(res, err)

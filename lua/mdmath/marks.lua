@@ -248,6 +248,22 @@ local function opts2extmark(opts, row, col)
                 end
                 is_last_virtual = true
             else
+                -- Conceal the raw source for this line so it is hidden even
+                -- where the image has no ink and on any extra screen row the
+                -- line occupies (wrapping itself is disabled for the window
+                -- while the preview is shown).
+                local conceal_data = {
+                    end_col = col + line[2],
+                    conceal = '',
+                    ephemeral = false,
+                    undo_restore = false,
+                }
+                table.insert(extmarks, {
+                    data = conceal_data,
+                    row = row,
+                    col = col,
+                })
+
                 local data = {
                     virt_text = row_data,
                     virt_text_pos = 'overlay',
