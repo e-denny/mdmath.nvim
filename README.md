@@ -75,6 +75,13 @@ opts = {
     -- WARNING: This do not affect how the images are displayed, only how many pixels are used to render them.
     --          See `dynamic_scale` to modify the displayed size.
     internal_scale = 1.0,
+
+    -- Command (string) or function(path) used to open image/attachment links
+    -- under the cursor (see `:MdMath open_image`). Defaults to `xdg-open`.
+    open_image_cmd = 'xdg-open',
+    -- Optional buffer-local keymap that opens the image/attachment link under
+    -- the cursor, e.g. 'gx' or '<C-]>'. nil disables the keymap.
+    open_image_key = nil,
 }
 ```
 
@@ -85,6 +92,7 @@ Currently, it only supports rendering the image inline, features like rendering 
   - `:MdMath disable`: Disable the plugin for the current buffer
   - `:MdMath clear`: Refresh all equations
   - `:MdMath build`: Build the node.js server
+  - `:MdMath open_image`: Open the image/attachment link under the cursor (Obsidian `![[img.svg|desc]]` / `[[img.svg|desc]]` or markdown `![desc](img.svg)`) with `open_image_cmd`.
 
 If you are using TMUX, remember to enable `allow-passthrough` in your `~/.tmux.conf`.
 

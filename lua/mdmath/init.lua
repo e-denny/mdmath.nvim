@@ -74,4 +74,8 @@ function M.build()
     require'mdmath.build'.build()
 end
 
+function M.open_image()
+    require 'mdmath.follow'.open_image()
+end
+
 return M

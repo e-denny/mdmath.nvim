@@ -27,6 +27,13 @@ local default_opts = {
     -- Scale factor for inline equations. Controls the rendered size relative to the terminal font.
     -- At 1.0 it uses dynamic_scale. Lower values shrink inline math to better match text size.
     inline_scale = 1.0,
+
+    -- Command (string) or function(path) used to open image/attachment links
+    -- under the cursor (see `:MdMath open_image`). Defaults to `xdg-open`.
+    open_image_cmd = 'xdg-open',
+    -- Optional buffer-local keymap that opens the image/attachment link under
+    -- the cursor, e.g. 'gx' or '<C-]>'. nil disables the keymap.
+    open_image_key = nil,
 }
 
 local _opts = nil
@@ -71,6 +78,8 @@ function M.validate()
         internal_scale = {opts.internal_scale, 'number'},
         baseline_frac = {opts.baseline_frac, {'number', 'nil'}},
         inline_scale = {opts.inline_scale, 'number'},
+        open_image_cmd = {opts.open_image_cmd, {'string', 'function'}},
+        open_image_key = {opts.open_image_key, {'string', 'nil'}},
     }
 
     opts.foreground = require'mdmath.util'.hl_as_hex(opts.foreground)

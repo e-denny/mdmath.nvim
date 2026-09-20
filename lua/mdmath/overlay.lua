@@ -115,6 +115,13 @@ function Buffer:_init(bufnr)
         end
     })
 
+    if config.open_image_key then
+        vim.keymap.set('n', config.open_image_key, '<cmd>MdMath open_image<CR>', {
+            buffer = bufnr,
+            desc = 'Open image/attachment under cursor',
+        })
+    end
+
     self:parse_view()
 end
 
