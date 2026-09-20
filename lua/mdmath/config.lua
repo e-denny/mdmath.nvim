@@ -34,6 +34,8 @@ local default_opts = {
     -- Optional buffer-local keymap that opens the image/attachment link under
     -- the cursor, e.g. 'gx' or '<C-]>'. nil disables the keymap.
     open_image_key = nil,
+    -- Optional buffer-local keymap that toggles automatic image previews.
+    toggle_images_key = nil,
 }
 
 local _opts = nil
@@ -80,6 +82,7 @@ function M.validate()
         inline_scale = {opts.inline_scale, 'number'},
         open_image_cmd = {opts.open_image_cmd, {'string', 'function'}},
         open_image_key = {opts.open_image_key, {'string', 'nil'}},
+        toggle_images_key = {opts.toggle_images_key, {'string', 'nil'}},
     }
 
     opts.foreground = require'mdmath.util'.hl_as_hex(opts.foreground)

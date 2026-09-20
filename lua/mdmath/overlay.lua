@@ -4,6 +4,8 @@ local ts = vim.treesitter
 local uv = vim.uv
 local Equation = require'mdmath.Equation'
 local config = require'mdmath.config'.opts
+local follow = require'mdmath.follow'
+local image_preview = require'mdmath.image_preview'
 
 local augroup = nvim.create_augroup('MdMathManager', {clear = true})
 
@@ -25,6 +27,7 @@ end
 function Buffer:_init(bufnr)
     self.bufnr = bufnr
     self.equations = {}
+    self.images = {}
     self.parser = get_parser(bufnr, 'markdown')
     self.active = true
     self.timer = uv.new_timer()
@@ -122,6 +125,13 @@ function Buffer:_init(bufnr)
         })
     end
 
+    if config.toggle_images_key then
+        vim.keymap.set('n', config.toggle_images_key, '<cmd>MdMath toggle_images<CR>', {
+            buffer = bufnr,
+            desc = 'Toggle image previews',
+        })
+    end
+
     self:parse_view()
 end
 
@@ -130,6 +140,8 @@ function Buffer:clear(reset)
         eq:invalidate()
     end
     self.equations = {}
+
+    self:clear_images()
 
     if reset then
         self:reset_timer()
@@ -194,6 +206,8 @@ function Buffer:parse(start_row, end_row)
     local parser = self.parser
     parser:parse({start_row, end_row})
 
+    self:parse_images(start_row, end_row)
+
     -- FIX: Almost sure we can move this block to initialization
     local inline_lang = 'markdown_inline'
     local inlines = parser:children()[inline_lang]
@@ -248,6 +262,53 @@ function Buffer:parse(start_row, end_row)
     self.equations = equations
 end
 
+function Buffer:has_image(row, target)
+    for _, img in ipairs(self.images) do
+        if img.valid and img.row == row and img.target == target then
+            return true
+        end
+    end
+    return false
+end
+
+function Buffer:clear_images()
+    for _, img in ipairs(self.images) do
+        img:invalidate()
+    end
+    self.images = {}
+end
+
+function Buffer:parse_images(start_row, end_row)
+    if not image_preview.enabled then
+        self:clear_images()
+        return
+    end
+
+    -- Drop previews invalidated by edits.
+    local live = {}
+    for _, img in ipairs(self.images) do
+        if img.valid then
+            live[#live + 1] = img
+        end
+    end
+    self.images = live
+
+    -- Detect renderable image links in view and create previews for new ones.
+    for row = start_row, end_row - 1 do
+        local line = nvim.buf_get_lines(self.bufnr, row, row + 1, false)[1]
+        if line then
+            for _, link in ipairs(follow.find_image_links(line)) do
+                if not self:has_image(row, link.target) then
+                    local img = image_preview.ImageLink.new(self.bufnr, row, link.target, link.len)
+                    if img then
+                        self.images[#self.images + 1] = img
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function create_buffer(bufnr)
     if not nvim.buf_is_valid(bufnr) then
         return nil
@@ -295,6 +356,19 @@ function M.clear(bufnr)
     if buffer then
         buffer:clear(true)
     end
+end
+
+function M.toggle_images(bufnr)
+    if bufnr == 0 then
+        bufnr = nvim.get_current_buf()
+    end
+    image_preview.enabled = not image_preview.enabled
+    local buffer = buffers[bufnr]
+    if buffer then
+        buffer:clear_images()
+        buffer:reset_timer()
+    end
+    vim.notify('mdmath.nvim: image previews ' .. (image_preview.enabled and 'enabled' or 'disabled'), vim.log.levels.INFO)
 end
 
 return M

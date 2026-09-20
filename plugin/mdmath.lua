@@ -11,7 +11,7 @@ if not vim.g.mdmath_disable_auto_setup and vim.v.vim_did_enter ~= 1 then
 end
 
 local subcommands = {
-    'enable', 'disable', 'clear', 'build', 'open_image'
+    'enable', 'disable', 'clear', 'build', 'open_image', 'toggle_images'
 }
 
 api.nvim_create_user_command('MdMath', function(opts)

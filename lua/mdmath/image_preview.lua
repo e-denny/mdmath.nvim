@@ -2,6 +2,7 @@ local vim = vim
 local nvim = require'mdmath.nvim'
 local uv = vim.loop
 local util = require'mdmath.util'
+local config = require'mdmath.config'.opts
 local Image = require'mdmath.Image'
 local marks = require'mdmath.marks'
 local terminfo = require'mdmath.terminfo'
@@ -10,87 +11,101 @@ local diacritics = require'mdmath.Image.diacritics'
 
 local M = {}
 
-local current = nil
+-- Global toggle for automatic image previews.
+M.enabled = true
+
+-- Rasterized PNG files we created (for cleanup on exit).
+local temp_files = {}
+
+-- Cache: absolute source path -> absolute PNG path (avoids re-rasterizing).
+local raster_cache = {}
 
 local PNG_SIG = '\137PNG\r\n\26\n'
 
-local function read_file(path)
-    local fd = uv.fs_open(path, 'r', 0)
-    if not fd then
-        return nil
+-- Resolve an image target relative to a buffer's directory.
+local function resolve_path(bufnr, target)
+    if vim.startswith(target, '/') then
+        return target
     end
-    local stat = uv.fs_fstat(fd)
-    if not stat then
-        uv.fs_close(fd)
-        return nil
-    end
-    local data = uv.fs_read(fd, stat.size, 0)
-    uv.fs_close(fd)
-    return data
+    local filepath = nvim.buf_get_name(bufnr)
+    local dir = vim.fn.fnamemodify(filepath, ':h')
+    return vim.fs.joinpath(dir, target)
 end
 
--- Read width/height from a PNG IHDR chunk.
-local function png_dimensions(data)
-    if #data < 24 or data:sub(1, 8) ~= PNG_SIG then
+-- Read width/height from a PNG file's IHDR chunk.
+local function png_file_dimensions(path)
+    local fd = uv.fs_open(path, 'r', 0)
+    if not fd then
+        return nil, nil
+    end
+    local data = uv.fs_read(fd, 24, 0)
+    uv.fs_close(fd)
+    if data == nil or #data < 24 or data:sub(1, 8) ~= PNG_SIG then
         return nil, nil
     end
     local w, h = 0, 0
     for i = 0, 3 do
-        w = w * 256 + data:byte(16 + i)
-        h = h * 256 + data:byte(20 + i)
+        w = w * 256 + data:byte(17 + i)
+        h = h * 256 + data:byte(21 + i)
     end
     return w, h
 end
 
--- Rasterize an image file to PNG bytes (SVG via rsvg-convert, other non-PNG
--- formats via ImageMagick). Returns png bytes or nil, err.
-local function rasterize(path)
+-- Rasterize an image to a PNG file. `callback` receives the PNG path or nil.
+local function rasterize_async(path, callback)
+    local cached = raster_cache[path]
+    if cached then
+        callback(cached)
+        return
+    end
+
     local ext = path:match('%.([^%.%/]+)$')
     ext = ext and ext:lower()
 
-    local png_path = path
-    local tmp
-    if ext ~= 'png' then
-        tmp = vim.fn.tempname() .. '.png'
-
-        local cmd
-        local args
-        if ext == 'svg' then
-            cmd = 'rsvg-convert'
-            args = { '-o', tmp, path }
-        elseif vim.fn.executable('magick') == 1 then
-            cmd = 'magick'
-            args = { path, tmp }
-        else
-            cmd = 'convert'
-            args = { path, tmp }
-        end
-
-        local argv = { cmd }
-        for _, a in ipairs(args) do
-            argv[#argv + 1] = a
-        end
-
-        local output = vim.fn.system(argv)
-        if vim.v.shell_error ~= 0 then
-            os.remove(tmp)
-            return nil, ('failed to convert image with %s: %s'):format(cmd, vim.trim(output))
-        end
-        png_path = tmp
+    if ext == 'png' then
+        raster_cache[path] = path
+        callback(path)
+        return
     end
 
-    local data = read_file(png_path)
-    if tmp then
-        os.remove(tmp)
+    local base = vim.fn.tempname()
+    os.remove(base) -- only want the unique name, not the empty placeholder file
+    local tmp = base .. '.png'
+
+    local cmd
+    local args
+    if ext == 'svg' then
+        cmd = 'rsvg-convert'
+        args = { '-o', tmp, path }
+    elseif vim.fn.executable('magick') == 1 then
+        cmd = 'magick'
+        args = { path, tmp }
+    else
+        cmd = 'convert'
+        args = { path, tmp }
     end
-    if data == nil then
-        return nil, 'failed to read image: ' .. png_path
+
+    local argv = { cmd }
+    for _, a in ipairs(args) do
+        argv[#argv + 1] = a
     end
-    return data
+
+    vim.fn.jobstart(argv, {
+        on_exit = function(_, code)
+            if code == 0 then
+                raster_cache[path] = tmp
+                temp_files[tmp] = true
+                callback(tmp)
+            else
+                os.remove(tmp)
+                callback(nil)
+            end
+        end,
+    })
 end
 
--- Convert pixel dimensions to cell dimensions, scaled to fit the current
--- window and the diacritics placeholder limit while preserving aspect ratio.
+-- Convert pixel dimensions to cell dimensions, scaled to fit the window and
+-- the diacritics placeholder limit while preserving aspect ratio.
 local function cell_dims(pixel_w, pixel_h)
     local cell_w, cell_h = terminfo.cell_size()
 
@@ -108,52 +123,19 @@ local function cell_dims(pixel_w, pixel_h)
     return cols, rows
 end
 
-local function clear()
-    if current == nil then
-        return
-    end
-    if current.image then
-        current.image:close()
-    end
-    if current.mark_id then
-        marks.remove(current.bufnr, current.mark_id)
-    end
-    if current.pos then
-        current.pos:cancel()
-    end
-    current = nil
-end
-
-function M.clear()
-    clear()
-end
-
--- Render `path` inline at the link described by `info`.
--- Returns true on success, false otherwise (after notifying).
-function M.show(path, info)
-    local data, err = rasterize(path)
-    if data == nil then
-        util.err_message(err)
-        return false
-    end
-
-    local pixel_w, pixel_h = png_dimensions(data)
+-- Render a rasterized PNG inline at `row`, overlaying the source line and
+-- adding the remaining rows (plus a blank spacer line) as virtual lines.
+local function render(bufnr, row, source_width, png_file)
+    local pixel_w, pixel_h = png_file_dimensions(png_file)
     if pixel_w == nil then
-        util.err_message('failed to decode image: ' .. path)
-        return false
+        return nil
     end
 
     local cols, rows = cell_dims(pixel_w, pixel_h)
 
-    clear()
-
-    local bufnr = nvim.get_current_buf()
-    local image = Image.new(rows, cols, data)
+    local image = Image.new(rows, cols, png_file)
     local texts = image:text()
 
-    -- The first image row overlays the link's source line (assumed to be the
-    -- whole line); remaining rows are virtual lines below it.
-    local source_width = util.linewidth(bufnr, info.row)
     local lines = {}
     for i = 1, rows do
         local text = texts[i]
@@ -165,30 +147,92 @@ function M.show(path, info)
             lines[i] = { text, -1 }
         end
     end
+    lines[#lines + 1] = { '', -1 } -- a little vertical breathing room
 
-    local mark_id = marks.add(bufnr, info.row, 0, {
+    local mark_id = marks.add(bufnr, row, 0, {
         lines = lines,
         color = image:color(),
     })
 
-    local pos = tracker.add(bufnr, info.row, 0, info.row, source_width)
-    if pos then
-        pos.on_finish = clear
-    end
-
-    current = { image = image, mark_id = mark_id, bufnr = bufnr, pos = pos }
-    return true
+    return image, mark_id
 end
 
--- Auto-clear the preview when its buffer is wiped.
+local ImageLink = util.class 'ImageLink'
+
+function ImageLink:_init(bufnr, row, target, len)
+    self.bufnr = bufnr
+    self.row = row
+    self.target = target
+    self.len = len
+    self.valid = true
+    self.created = false
+    self.image = nil
+    self.mark_id = nil
+
+    local source_width = util.linewidth(bufnr, row)
+
+    -- Invalidate when the line is edited.
+    self.pos = tracker.add(bufnr, row, 0, row, source_width)
+    if self.pos then
+        self.pos.on_finish = function()
+            self:invalidate()
+        end
+    end
+
+    local path = resolve_path(bufnr, target)
+    if vim.fn.filereadable(path) ~= 1 then
+        return false
+    end
+
+    rasterize_async(path, function(png_file)
+        if not self.valid or png_file == nil then
+            return
+        end
+        vim.schedule(function()
+            if not self.valid then
+                return
+            end
+            local image, mark_id = render(self.bufnr, self.row, source_width, png_file)
+            if image then
+                self.image = image
+                self.mark_id = mark_id
+                self.created = true
+            end
+        end)
+    end)
+end
+
+function ImageLink:invalidate()
+    if not self.valid then
+        return
+    end
+    self.valid = false
+    if self.created then
+        if self.image then
+            self.image:close()
+        end
+        if self.mark_id then
+            marks.remove(self.bufnr, self.mark_id)
+        end
+        self.created = false
+    end
+    if self.pos then
+        self.pos:cancel()
+    end
+end
+
+M.ImageLink = ImageLink
+
+-- Clean up rasterized temp files on exit.
 do
     local group = nvim.create_augroup('MdMathImagePreview', { clear = true })
-    nvim.create_autocmd('BufWipeout', {
+    nvim.create_autocmd('VimLeave', {
         group = group,
-        callback = function(ev)
-            if current and current.bufnr == ev.buf then
-                clear()
+        callback = function()
+            for path in pairs(temp_files) do
+                os.remove(path)
             end
+            temp_files = {}
         end,
     })
 end

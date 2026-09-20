@@ -78,4 +78,8 @@ function M.open_image()
     require 'mdmath.follow'.open_image()
 end
 
+function M.toggle_images()
+    require 'mdmath.overlay'.toggle_images(0)
+end
+
 return M

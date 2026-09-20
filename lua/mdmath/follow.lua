@@ -4,8 +4,7 @@ local util = require'mdmath.util'
 
 local M = {}
 
--- Extensions that are treated as attachments. Anything else (including `.md`
--- notes and extension-less wiki titles) is left to obsidian.nvim / `gf`.
+-- Extensions treated as attachments (opened externally when not renderable).
 local ATTACHMENT_EXTENSIONS = {
     svg = true,
     png = true,
@@ -23,6 +22,18 @@ local ATTACHMENT_EXTENSIONS = {
     wav = true,
     zip = true,
     csv = true,
+}
+
+-- Extensions we can rasterize and render inline with the Kitty protocol.
+local IMAGE_EXTENSIONS = {
+    svg = true,
+    png = true,
+    jpg = true,
+    jpeg = true,
+    gif = true,
+    webp = true,
+    bmp = true,
+    tiff = true,
 }
 
 -- Link forms recognized:
@@ -50,10 +61,22 @@ local function parse_target(raw)
     return target
 end
 
-local function is_attachment(target)
+local function extension_of(target)
     local ext = target:match('%.([^%.%/]+)$')
-    return ext ~= nil and ATTACHMENT_EXTENSIONS[ext:lower()] == true
+    return ext and ext:lower() or nil
 end
+
+local function is_attachment(target)
+    local ext = extension_of(target)
+    return ext ~= nil and ATTACHMENT_EXTENSIONS[ext] == true
+end
+
+local function is_image(target)
+    local ext = extension_of(target)
+    return ext ~= nil and IMAGE_EXTENSIONS[ext] == true
+end
+
+M.is_image = is_image
 
 -- Return info about the attachment link under the cursor, or nil.
 -- info = { target = string, row = number, col = number, len = number },
@@ -81,6 +104,27 @@ function M.image_link_info()
     end
 
     return nil
+end
+
+-- Find all renderable image links in a line.
+-- Returns a list of { target = string, col = number, len = number } (col 0-indexed).
+function M.find_image_links(line)
+    local links = {}
+    for _, pattern in ipairs(LINK_PATTERNS) do
+        local search_start = 1
+        while search_start <= #line do
+            local s, e = line:find(pattern, search_start)
+            if s == nil then
+                break
+            end
+            local target = parse_target(line:sub(s, e))
+            if target ~= nil and is_image(target) then
+                links[#links + 1] = { target = target, col = s - 1, len = e - s + 1 }
+            end
+            search_start = e + 1
+        end
+    end
+    return links
 end
 
 function M.image_link_under_cursor()
@@ -113,14 +157,12 @@ function M.open_image()
         return
     end
 
-    -- Try an in-terminal preview (Kitty graphics protocol) first.
-    local preview = require 'mdmath.image_preview'
-    if preview.show(path, info) then
-        return
+    -- Image links render in place automatically; other attachments open externally.
+    if is_image(info.target) then
+        vim.notify('mdmath.nvim: image links render in place automatically (toggle with :MdMath toggle_images)', vim.log.levels.INFO)
+    else
+        open_external(path)
     end
-
-    -- Fall back to the external opener (also handles PDFs, videos, etc.).
-    open_external(path)
 end
 
 return M

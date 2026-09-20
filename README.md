@@ -83,6 +83,8 @@ opts = {
     -- Optional buffer-local keymap that opens the image/attachment link under
     -- the cursor, e.g. 'gx' or '<C-]>'. nil disables the keymap.
     open_image_key = nil,
+    -- Optional buffer-local keymap that toggles automatic image previews.
+    toggle_images_key = nil,
 }
 ```
 
@@ -93,7 +95,10 @@ Currently, it only supports rendering the image inline, features like rendering 
   - `:MdMath disable`: Disable the plugin for the current buffer
   - `:MdMath clear`: Refresh all equations
   - `:MdMath build`: Build the node.js server
-  - `:MdMath open_image`: Render the image/attachment link under the cursor inline using the Kitty graphics protocol (Obsidian `![[img.svg|desc]]` / `[[img.svg|desc]]` or markdown `![desc](img.svg)`). SVG is rasterized with `rsvg-convert`, other non-PNG formats with ImageMagick; falls back to `open_image_cmd` when in-terminal rendering isn't possible.
+  - `:MdMath toggle_images`: Toggle automatic in-place image previews on/off.
+  - `:MdMath open_image`: Open the link under the cursor. Image links (Obsidian `![[img.svg|desc]]` / `[[img.svg|desc]]` or markdown `![desc](img.svg)`) are rendered in place automatically (use `toggle_images` to hide them); other attachments (PDFs, videos, ...) are opened with `open_image_cmd`.
+
+Image links are rasterized and rendered in place automatically as you scroll, using the same Kitty graphics protocol as equations. SVG is rasterized with `rsvg-convert`, other non-PNG formats with ImageMagick.
 
 If you are using TMUX, remember to enable `allow-passthrough` in your `~/.tmux.conf`.
 
