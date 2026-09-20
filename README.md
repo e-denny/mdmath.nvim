@@ -76,8 +76,9 @@ opts = {
     --          See `dynamic_scale` to modify the displayed size.
     internal_scale = 1.0,
 
-    -- Command (string) or function(path) used to open image/attachment links
-    -- under the cursor (see `:MdMath open_image`). Defaults to `xdg-open`.
+    -- Command (string) or function(path) used as a fallback to open image/
+    -- attachment links that can't be rendered in the terminal (see
+    -- `:MdMath open_image`). Defaults to `xdg-open`.
     open_image_cmd = 'xdg-open',
     -- Optional buffer-local keymap that opens the image/attachment link under
     -- the cursor, e.g. 'gx' or '<C-]>'. nil disables the keymap.
@@ -92,7 +93,7 @@ Currently, it only supports rendering the image inline, features like rendering 
   - `:MdMath disable`: Disable the plugin for the current buffer
   - `:MdMath clear`: Refresh all equations
   - `:MdMath build`: Build the node.js server
-  - `:MdMath open_image`: Open the image/attachment link under the cursor (Obsidian `![[img.svg|desc]]` / `[[img.svg|desc]]` or markdown `![desc](img.svg)`) with `open_image_cmd`.
+  - `:MdMath open_image`: Render the image/attachment link under the cursor inline using the Kitty graphics protocol (Obsidian `![[img.svg|desc]]` / `[[img.svg|desc]]` or markdown `![desc](img.svg)`). SVG is rasterized with `rsvg-convert`, other non-PNG formats with ImageMagick; falls back to `open_image_cmd` when in-terminal rendering isn't possible.
 
 If you are using TMUX, remember to enable `allow-passthrough` in your `~/.tmux.conf`.
 
