@@ -58,8 +58,8 @@ end
 -- Return the attachment target under the cursor, or nil.
 function M.image_link_under_cursor()
     local line = nvim.get_current_line()
-    local _, col = nvim.win_get_cursor(0)
-    col = col + 1 -- nvim_win_get_cursor returns a 0-indexed column
+    local _, col = util.get_cursor(0)
+    col = col + 1 -- get_cursor returns a 0-indexed column
 
     for _, pattern in ipairs(LINK_PATTERNS) do
         local search_start = 1
