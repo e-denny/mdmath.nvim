@@ -28,6 +28,13 @@ local default_opts = {
     -- At 1.0 it uses dynamic_scale. Lower values shrink inline math to better match text size.
     inline_scale = 1.0,
 
+    -- Display width of inline image previews, in terminal cells. When set,
+    -- images are scaled (up or down) to this width, preserving their aspect
+    -- ratio; they are still shrunk to fit the window if it is narrower.
+    -- nil keeps the image at its native pixel size (1 image pixel per terminal
+    -- pixel), which renders small images small.
+    image_width = nil,
+
     -- Command (string) or function(path) used to open image/attachment links
     -- under the cursor (see `:MdMath open_image`). Defaults to `xdg-open`.
     open_image_cmd = 'xdg-open',
@@ -80,6 +87,7 @@ function M.validate()
         internal_scale = {opts.internal_scale, 'number'},
         baseline_frac = {opts.baseline_frac, {'number', 'nil'}},
         inline_scale = {opts.inline_scale, 'number'},
+        image_width = {opts.image_width, {'number', 'nil'}},
         open_image_cmd = {opts.open_image_cmd, {'string', 'function'}},
         open_image_key = {opts.open_image_key, {'string', 'nil'}},
         toggle_images_key = {opts.toggle_images_key, {'string', 'nil'}},

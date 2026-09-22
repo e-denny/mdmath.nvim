@@ -104,19 +104,34 @@ local function rasterize_async(path, callback)
     })
 end
 
--- Convert pixel dimensions to cell dimensions, scaled to fit the window and
--- the diacritics placeholder limit while preserving aspect ratio.
+-- Convert pixel dimensions to cell dimensions.
+--
+-- With `image_width` set, the image is rescaled to that many cells wide
+-- (upscaling small rasters, so they may look soft), preserving aspect ratio.
+-- Otherwise the native pixel size is used (1 image pixel per terminal pixel).
+-- Either way the result is shrunk to fit the window and the diacritics
+-- placeholder limit.
 local function cell_dims(pixel_w, pixel_h)
     local cell_w, cell_h = terminfo.cell_size()
 
-    local cols = math.ceil(pixel_w / cell_w)
-    local rows = math.ceil(pixel_h / cell_h)
+    local cols, rows
+    if config.image_width then
+        local scale = (config.image_width * cell_w) / pixel_w
+        cols = config.image_width
+        rows = (pixel_h * scale) / cell_h
+    else
+        cols = math.ceil(pixel_w / cell_w)
+        rows = math.ceil(pixel_h / cell_h)
+    end
 
     local win_cols = nvim.win_get_width(0)
     local win_rows = nvim.win_get_height(0)
     local max = #diacritics
 
-    local scale = math.min(1, (win_cols - 2) / cols, (win_rows - 2) / rows, max / cols, max / rows)
+    local max_cols = math.max(1, math.min(win_cols - 2, max))
+    local max_rows = math.max(1, math.min(win_rows - 2, max))
+
+    local scale = math.min(1, max_cols / cols, max_rows / rows)
 
     cols = math.max(1, math.floor(cols * scale))
     rows = math.max(1, math.floor(rows * scale))

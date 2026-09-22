@@ -76,6 +76,13 @@ opts = {
     --          See `dynamic_scale` to modify the displayed size.
     internal_scale = 1.0,
 
+    -- Display width of inline image previews, in terminal cells. When set,
+    -- images are scaled (up or down) to this width, preserving their aspect
+    -- ratio; they are still shrunk to fit the window if it is narrower.
+    -- nil keeps the image at its native pixel size (1 image pixel per terminal
+    -- pixel), which renders small images small.
+    image_width = nil,
+
     -- Command (string) or function(path) used as a fallback to open image/
     -- attachment links that can't be rendered in the terminal (see
     -- `:MdMath open_image`). Defaults to `xdg-open`.
